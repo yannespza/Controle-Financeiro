@@ -328,7 +328,16 @@ html,body{margin:0}
 <script>
 (function(){
 "use strict";
-var TRANSF="Transferência";
+var TRANSF="Transferência", CARTAO="Cartão Crédito";
+function cartaoHTML(c){
+  var cfg=state.cfg, nomes=cfg.uberNomes; if(!nomes||!nomes.length)return "";
+  var row=c.rows.filter(function(r){return r.nome===CARTAO;})[0], fatura=-(row?row.cur:0);
+  var u=((cfg.uber||{})[c.key]||[]), sem=fatura;
+  var h='<div class="sec"><span class="cap">Cartão de crédito</span><div class="block"><div class="kv"><span>Fatura do cartão</span><b class="num">'+money(fatura)+'</b></div>';
+  nomes.forEach(function(n,i){var v=Number(u[i])||0;sem-=v;
+    h+='<div class="kv"><label for="u'+i+'">'+esc(n)+'</label><input id="u'+i+'" class="num" inputmode="decimal" value="'+(v?nf.format(v):'')+'" placeholder="0,00" data-uber="'+i+'"></div>';});
+  return h+'<div class="kv strong"><span>Fatura sem Uber</span><b class="num">'+money(sem)+'</b></div></div></div>';
+}
 var MESES=["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
 var AB=["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
 var DIAS=["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
@@ -566,6 +575,7 @@ function drawPainel(){
      '<div class="kv"><span>Mês passado</span><b class="num">'+money(c.disp.prev)+'</b></div>'+
      '<div class="kv strong"><span>Economia</span><b class="num '+(c.disp.eco>0.005?'pos':(c.disp.eco<-0.005?'neg':''))+'">'+moneyS(c.disp.eco)+'</b></div></div>'+
      '<span class="note">Soma das categorias que você marcou como dispensáveis.</span></div>';
+  h+=cartaoHTML(c);
   var okS=Math.abs(c.chk.saldos)<0.005, okT=Math.abs(c.chk.transf)<0.005;
   h+='<div class="sec"><span class="cap">Conferência</span><div class="block">'+
      '<div class="kv"><span>Saldos x balanço do mês</span><span class="pill '+(okS?'ok':'bad')+'">'+(okS?'OK':money(c.chk.saldos))+'</span></div>'+
@@ -635,7 +645,7 @@ function drawMais(){
     return '<div class="kv"><span><i class="swatch" style="--c:'+esc(a.cor)+'"></i>'+esc(a.nome)+(a.nome===cfg.padrao?' <span class="pill">padrão</span>':'')+(a.reserva?' <span class="pill">reserva</span>':'')+'</span><span class="num muted">'+money(a.saldo)+'</span></div>';}).join("")+'</div>'+
     '<span class="note">Valores = saldo inicial de cada conta, que vale em '+fdmy(cfg.inicio||today())+'. A conta padrão aparece no topo do painel e já vem escolhida ao lançar.</span>'+
     '<button class="btn" id="editCfg">Editar contas e categorias</button></div>';
-  h+='<div class="sec"><span class="cap">Categorias</span><div class="chips">'+cfg.cats.filter(function(c){return c.nome&&c.nome!==TRANSF;}).map(function(c){return '<span class="chip">'+esc(c.nome)+(c.peso?' · dispensável':'')+'</span>';}).join("")+'</div></div>';
+  h+='<div class="sec"><span class="cap">Categorias</span><div class="chips">'+cfg.cats.filter(function(c){return c.nome&&c.nome!==TRANSF;}).map(function(c){return '<span class="chip">'+esc(c.nome)+(c.peso?(c.peso<1?' · '+Math.round(c.peso*100)+'% dispensável':' · dispensável'):'')+'</span>';}).join("")+'</div></div>';
   h+='<div class="sec"><span class="cap">Recomeçar</span><button class="btn danger" id="resetBtn">Apagar tudo e recomeçar</button><span class="note">Apaga lançamentos, contas e categorias deste aparelho. Dá para desfazer logo em seguida.</span></div>';
   $("#v-mais").innerHTML=h;
 }
@@ -659,6 +669,13 @@ document.addEventListener("click",function(e){
 $("#q").addEventListener("input",function(e){state.q=e.target.value;render();});
 window.addEventListener("hashchange",function(){var v=VIEWS[location.hash.slice(1)];if(v&&v!==state.view){state.view=v;render();}});
 document.addEventListener("visibilitychange",function(){if(!document.hidden)render();});
+document.addEventListener("change",function(e){
+  var el=e.target; if(!el.matches||!el.matches("[data-uber]")||!state.cfg)return;
+  var cfg=JSON.parse(JSON.stringify(state.cfg)), i=Number(el.dataset.uber);
+  cfg.uber=cfg.uber||{}; var cur=(cfg.uber[state.month]||[]).slice(); while(cur.length<=i)cur.push(0);
+  cur[i]=parseMoney(el.value)||0; cfg.uber[state.month]=cur;
+  putCfg(cfg).then(function(){toast("Uber salvo");});
+});
 
 /* ---------- folha de lançar ---------- */
 var F={mode:"saiu",id:null,pair:null,cat:"",conta:"",conta2:"",date:"",busy:false};
@@ -978,8 +995,8 @@ function saveSetup(){
   if(!err&&!cats.length)err="Escolha pelo menos uma categoria.";
   if(err){d.err=err;render();return;}
   var pad=cs.filter(function(a){return a.padrao;})[0]||cs[0];
-  var cfg={contas:cs.map(function(a){return {nome:a.nome,saldo:a.saldo,cor:a.cor,reserva:a.reserva};}),padrao:pad.nome,
-    cats:cats.map(function(c){return {nome:c.nome,peso:c.peso>0?1:0};}).concat([{nome:TRANSF,peso:0}]),inicio:d.inicio};
+  var cfg=Object.assign({},state.cfg&&!d.isNew?state.cfg:{},{contas:cs.map(function(a){return {nome:a.nome,saldo:a.saldo,cor:a.cor,reserva:a.reserva};}),padrao:pad.nome,
+    cats:cats.map(function(c){return {nome:c.nome,peso:c.peso>0?c.peso:0};}).concat([{nome:TRANSF,peso:0}]),inicio:d.inicio});
   var wasNew=d.isNew;
   putCfg(cfg).then(function(){
     state.setup=null;
