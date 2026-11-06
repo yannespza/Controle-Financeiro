@@ -1023,7 +1023,7 @@ function armReset(b){
   replaceAll({cfg:null,tx:{}},"Tudo apagado");
 }
 function localSave(r){return new Promise(function(res,rej){try{
-  var tipo=/\.json$/i.test(r.filename)?"application/json":"text/csv;charset=utf-8";
+  var tipo=/\.json$/i.test(r.filename)?"application/json":(/\.xlsx$/i.test(r.filename)?"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":"text/csv;charset=utf-8");
   var u=URL.createObjectURL(new Blob([r.data],{type:tipo})),a=document.createElement("a");
   a.href=u;a.download=r.filename;document.body.appendChild(a);a.click();
   setTimeout(function(){URL.revokeObjectURL(u);a.remove();},4000);res({status:"saved"});
