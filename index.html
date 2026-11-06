@@ -322,7 +322,7 @@ html,body{margin:0}
   </form>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
-<input type="file" id="restoreFile" accept="application/json,.json" hidden>
+<input type="file" id="restoreFile" hidden>
 <div class="tip" id="tip" role="tooltip" hidden></div>
 
 <script>
@@ -1056,8 +1056,9 @@ function backupJSON(){
 function restoreFrom(file){
   var rd=new FileReader();
   rd.onload=function(){
-    var o;try{o=JSON.parse(String(rd.result));}catch(e){toast("Arquivo inválido");return;}
-    if(!o||o.app!=="meu-controle-financeiro"||!o.cfg||!Array.isArray(o.cfg.contas)||!o.tx||typeof o.tx!=="object"){toast("Este arquivo não é uma cópia deste app");return;}
+    var o;try{o=JSON.parse(String(rd.result).replace(/^\uFEFF/,"").trim());}catch(e){toast("Esse arquivo não é uma cópia de segurança do app");return;}
+    if(o&&Array.isArray(o.tx)){var m={};o.tx.forEach(function(t,i){if(t&&t.date){var c=Object.assign({},t),id=c.id||("r"+i);delete c.id;m[id]=c;}});o.tx=m;}
+    if(!o||!/controle-financeiro/.test(o.app||"")||!o.cfg||!Array.isArray(o.cfg.contas)||!o.tx||typeof o.tx!=="object"){toast("Este arquivo não é uma cópia deste app");return;}
     replaceAll({cfg:o.cfg,tx:o.tx},"Cópia restaurada: "+Object.keys(o.tx).length+" lançamentos");
   };
   rd.onerror=function(){toast("Não consegui ler o arquivo");};
